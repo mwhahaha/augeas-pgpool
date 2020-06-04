@@ -84,16 +84,39 @@ let word_quot =
   in let value = (no_quot|esc_squot)* - forbidden
   in Quote.do_squote (store value)
 
+(* View: word_unquot
+   Any unquoted word that is not handled by <log_word_re> or <bool_word_re>.
+   Needed to support newly introduced enums *)
+let word_unquot =
+     let unquot_forbidden = bool_word_re | log_word_re | number_re
+  in let unquot_value = Rx.word - unquot_forbidden
+  in store unquot_value
+
+(* Variable: enum_vars_re
+   Keywords in the pgpool configuration related to enum values *)
+let enum_vars_re = "relcache_query_target"
+                 | "check_temp_table"
+
+(* Variable: vars_re
+   All possible pgpool keywords, except for enum related ones *)
+let vars_re = Rx.word - enum_vars_re
+
 (* View: entry_gen
-     Builder to construct entries *)
+     Builder to construct entries non-enum keywords*)
 let entry_gen (lns:lens) =
-  Util.indent . Build.key_value_line_comment Rx.word sep lns Util.comment_eol
+  Util.indent . Build.key_value_line_comment vars_re sep lns Util.comment_eol
+
+(* View: enum_entry_gen
+     Builder to construct entries for enum keywords *)
+let enum_entry_gen (lns:lens) =
+  Util.indent . Build.key_value_line_comment enum_vars_re sep lns Util.comment_eol
 
 (* View: entry *)
 let entry = entry_gen number
           | entry_gen bool_word
           | entry_gen log_word
-          | entry_gen word_quot    (* anything else *)
+          | entry_gen word_quot
+          | enum_entry_gen word_unquot
 
 (* View: lns *)
 let lns = (Util.empty | Util.comment | entry)*
